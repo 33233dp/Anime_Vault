@@ -15,10 +15,14 @@ env/
 !.env.example
 
 # Runtime data
+data/
 data/*.db
 data/*.sqlite
 data/*.sqlite3
 *.log
+
+# Playlists may contain private or signed media URLs
+m3u8/*.m3u8
 
 # Local backups and temporary files
 backup_*/
