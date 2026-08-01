@@ -92,7 +92,7 @@ def render_anime_form_page(
         "FORM_HINT": (
             "修改基础信息、海报剧照、播放地址和剧集配置。slug 会保持不变。"
             if is_edit
-            else "海报和剧照既可以手填项目内路径，也可以直接拖入图片，或从当前设备本地文件中选择上传。"
+            else "海报和剧照可以手填项目内路径或直接上传；M3U8 资源可不提供图片。"
         ),
         "SLUG_READONLY": "readonly" if is_edit else "",
         "SUBMIT_LABEL": "保存修改" if is_edit else "创建番剧",

@@ -1,10 +1,30 @@
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlsplit, urlunsplit
 
 
 MAX_PLAYLIST_SIZE = 2 * 1024 * 1024
+URL_PATH_SAFE = "/%:@!$&'()*+,;=-._~"
+URL_QUERY_SAFE = "/%?:@!$&'()*+,;=-._~"
+
+
+def normalize_http_url(raw_url: str) -> str:
+    parsed = urlsplit(raw_url)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(
+            "M3U8 中的播放地址必须是完整的 HTTP 或 HTTPS 链接："
+            f"{raw_url}"
+        )
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            quote(parsed.path, safe=URL_PATH_SAFE),
+            quote(parsed.query, safe=URL_QUERY_SAFE),
+            quote(parsed.fragment, safe=URL_QUERY_SAFE),
+        )
+    )
 
 
 def parse_m3u8_upload(filename: str, payload: bytes) -> list[dict[str, str]]:
@@ -36,17 +56,12 @@ def parse_m3u8_upload(filename: str, payload: bytes) -> list[dict[str, str]]:
         if line.startswith("#"):
             continue
 
-        parsed = urlparse(line)
-        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-            raise ValueError(
-                "M3U8 中的播放地址必须是完整的 HTTP 或 HTTPS 链接："
-                f"{line}"
-            )
+        playback_url = normalize_http_url(line)
         episode_number = len(episodes) + 1
         episodes.append(
             {
                 "title": pending_title or f"第 {episode_number} 集",
-                "url": line,
+                "url": playback_url,
             }
         )
         pending_title = ""

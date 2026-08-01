@@ -23,6 +23,7 @@ from .playlists import parse_m3u8_upload
 from .renderers import (
     asset_url,
     compose_episode_url,
+    local_placeholder_url,
     render_anime_form_page,
     render_card,
     render_chip_list,
@@ -427,7 +428,11 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 "SYNOPSIS": html.escape(anime["synopsis"]),
                 "PLAYBACK_SECTION": render_playback_section(anime),
                 "EPISODE_SECTION": render_episode_section(anime),
-                "POSTER_URL": asset_url(anime["poster_path"]) if anime.get("poster_path") else "",
+                "POSTER_URL": (
+                    asset_url(anime["poster_path"])
+                    if anime.get("poster_path")
+                    else local_placeholder_url(str(anime["title"]))
+                ),
                 "BACKDROP_URL": asset_url(anime["still_path"]) if anime.get("still_path") else "",
                 "CAST_ITEMS": render_chip_list(anime["cast"], "cast"),
                 "KEYWORD_ITEMS": render_chip_list(anime["keywords"], "keyword"),
@@ -526,7 +531,11 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         if not values["slug"] or not values["title"]:
             return {"values": values, "record": None, "error": "slug 和番剧名为必填项。"}
 
-        if values["playback_mode"] != "local":
+        requires_images = (
+            values["playback_mode"] != "local"
+            and values["resource_type"] != "playlist"
+        )
+        if requires_images:
             if not values["poster_path"] and not self.has_uploaded_file(poster_upload):
                 return {
                     "values": values,

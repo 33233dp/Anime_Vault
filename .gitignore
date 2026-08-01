@@ -22,7 +22,11 @@ data/*.sqlite3
 *.log
 
 # Playlists may contain private or signed media URLs
-m3u8/*.m3u8
+*.m3u8
+
+# User-uploaded media should never be committed to the public repository
+poster/*
+Stills/*
 
 # Local backups and temporary files
 backup_*/

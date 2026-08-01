@@ -35,6 +35,19 @@ class ParseM3U8UploadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "没有找到"):
             parse_m3u8_upload("episodes.m3u8", b"#EXTM3U\n#PLAYLIST:Empty")
 
+    def test_encodes_unicode_and_square_brackets_in_playback_url(self) -> None:
+        payload = (
+            "#EXTM3U\n"
+            "#EXTINF:-1,第 1 集\n"
+            "http://media.example.test/动漫/[Group][01].mp4?sign=a:b\n"
+        ).encode()
+
+        episodes = parse_m3u8_upload("episodes.m3u8", payload)
+
+        self.assertIn("%E5%8A%A8%E6%BC%AB", episodes[0]["url"])
+        self.assertIn("%5BGroup%5D%5B01%5D.mp4", episodes[0]["url"])
+        self.assertTrue(episodes[0]["url"].endswith("?sign=a:b"))
+
 
 if __name__ == "__main__":
     unittest.main()
