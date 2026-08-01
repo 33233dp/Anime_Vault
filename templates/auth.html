@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{AUTH_TITLE}} - Anime Vault</title>
+  <meta name="description" content="Anime Vault 私人访问验证。">
+  <link rel="stylesheet" href="/static/styles.css?v=20260801-private-access">
+</head>
+<body class="auth-page">
+  <div class="page-shell">
+    <main class="auth-layout">
+      <section class="auth-panel">
+        <p class="eyebrow">{{AUTH_EYEBROW}}</p>
+        <h1>{{AUTH_TITLE}}</h1>
+        <p class="auth-panel__hint">{{AUTH_HINT}}</p>
+        {{ERROR_BANNER}}
+        <form class="auth-form" method="post" action="{{AUTH_FORM_ACTION}}">
+          <label class="auth-field">
+            <span>访问密码</span>
+            <input name="password" type="password" required minlength="6" autocomplete="{{AUTH_PASSWORD_AUTOCOMPLETE}}" autofocus>
+          </label>
+          {{AUTH_CONFIRM_FIELD}}
+          <button class="auth-submit" type="submit">{{AUTH_SUBMIT_LABEL}}</button>
+        </form>
+        <p class="auth-panel__footnote">没有帐号注册流程，密码仅用于保护这台设备上的个人馆藏。</p>
+        <a class="back-link auth-back-link" href="/">返回首页</a>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

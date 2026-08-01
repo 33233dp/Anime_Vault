@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import cgi
+import hashlib
+import hmac
 import html
 import re
+import time
 from http import HTTPStatus
+from http.cookies import CookieError, SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -35,10 +39,13 @@ from .repository import (
     load_playback_activity,
     record_playback_activity,
     record_last_played_episode,
+    load_privacy_settings,
+    save_access_password,
     save_episode_progress,
     save_episode_config,
     save_playback_url,
     update_anime,
+    verify_access_password,
 )
 
 
@@ -65,6 +72,8 @@ UPLOAD_TARGETS = {
     "poster_file": (POSTER_DIR, "poster"),
     "still_file": (STILLS_DIR, "still"),
 }
+AUTH_COOKIE_NAME = "anime_vault_session"
+AUTH_SESSION_SECONDS = 12 * 60 * 60
 
 
 class AnimeRequestHandler(SimpleHTTPRequestHandler):
@@ -72,11 +81,15 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(BASE_DIR), **kwargs)
 
     def do_GET(self) -> None:
+        if self.handle_authentication_gate():
+            return
         if self.handle_dynamic_route(include_body=True):
             return
         super().do_GET()
 
     def do_HEAD(self) -> None:
+        if self.handle_authentication_gate():
+            return
         if self.handle_dynamic_route(include_body=False):
             return
         super().do_HEAD()
@@ -84,6 +97,17 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         route = unquote(parsed.path)
+        if route == "/auth/unlock":
+            self.unlock_site()
+            return
+        if route == "/auth/setup":
+            self.setup_site_password()
+            return
+        if route == "/auth/logout":
+            self.logout_site()
+            return
+        if self.handle_authentication_gate():
+            return
         if route == "/anime/create":
             self.create_anime_entry()
             return
@@ -114,6 +138,17 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         route = unquote(parsed.path)
         if route == "/":
             self.render_home(include_body=include_body)
+            return True
+        if route in {"/auth", "/auth/setup"}:
+            auth_mode = "unlock"
+            if route == "/auth/setup" and (
+                not self.password_is_configured() or self.has_valid_auth_session()
+            ):
+                auth_mode = "setup"
+            self.render_auth_page(
+                auth_mode,
+                include_body=include_body,
+            )
             return True
         if route == "/anime/new":
             self.render_anime_form(include_body=include_body)
@@ -150,6 +185,163 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 return True
         return False
 
+    def password_is_configured(self) -> bool:
+        return load_privacy_settings() is not None
+
+    def has_valid_auth_session(self) -> bool:
+        settings = load_privacy_settings()
+        if settings is None:
+            return False
+
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except (CookieError, ValueError):
+            return False
+        morsel = cookie.get(AUTH_COOKIE_NAME)
+        if morsel is None:
+            return False
+
+        raw_value = morsel.value
+        issued_at_raw, separator, signature = raw_value.partition(".")
+        if not separator or not issued_at_raw.isdigit() or not signature:
+            return False
+        issued_at = int(issued_at_raw)
+        now = int(time.time())
+        if issued_at > now or now - issued_at > AUTH_SESSION_SECONDS:
+            return False
+        expected = hmac.new(
+            bytes(settings["session_secret"]),
+            issued_at_raw.encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(signature, expected)
+
+    def handle_authentication_gate(self) -> bool:
+        route = unquote(urlparse(self.path).path)
+        if route in {
+            "/static/styles.css",
+            "/static/app.js",
+            "/auth",
+            "/auth/setup",
+        }:
+            return False
+        if not self.password_is_configured() or self.has_valid_auth_session():
+            return False
+        if route == "/":
+            self.render_auth_page("unlock")
+        else:
+            self.redirect("/", HTTPStatus.FOUND)
+        return True
+
+    def auth_cookie_value(self) -> str:
+        settings = load_privacy_settings()
+        if settings is None:
+            return ""
+        issued_at = str(int(time.time()))
+        signature = hmac.new(
+            bytes(settings["session_secret"]),
+            issued_at.encode("ascii"),
+            hashlib.sha256,
+        ).hexdigest()
+        return f"{issued_at}.{signature}"
+
+    def set_auth_cookie_header(self, value: str, max_age: int | None = None) -> str:
+        attributes = [
+            f"{AUTH_COOKIE_NAME}={value}",
+            "Path=/",
+            "HttpOnly",
+            "SameSite=Strict",
+        ]
+        if max_age is not None:
+            attributes.append(f"Max-Age={max_age}")
+        return "; ".join(attributes)
+
+    def unlock_site(self) -> None:
+        if not self.password_is_configured():
+            self.render_auth_page("setup")
+            return
+        form_data = self.read_form_data()
+        password = form_data.get("password", [""])[0]
+        if not verify_access_password(password):
+            self.render_auth_page("unlock", "密码不正确，请重新输入。")
+            return
+        self.redirect(
+            "/",
+            HTTPStatus.SEE_OTHER,
+            {"Set-Cookie": self.set_auth_cookie_header(self.auth_cookie_value())},
+        )
+
+    def setup_site_password(self) -> None:
+        if self.password_is_configured() and not self.has_valid_auth_session():
+            self.render_auth_page("unlock")
+            return
+
+        form_data = self.read_form_data()
+        password = form_data.get("password", [""])[0]
+        confirmation = form_data.get("password_confirmation", [""])[0]
+        if len(password) < 6:
+            self.render_auth_page("setup", "密码至少需要 6 个字符。")
+            return
+        if password != confirmation:
+            self.render_auth_page("setup", "两次输入的密码不一致。")
+            return
+
+        save_access_password(password)
+        self.redirect(
+            "/",
+            HTTPStatus.SEE_OTHER,
+            {"Set-Cookie": self.set_auth_cookie_header(self.auth_cookie_value())},
+        )
+
+    def logout_site(self) -> None:
+        self.redirect(
+            "/",
+            HTTPStatus.SEE_OTHER,
+            {"Set-Cookie": self.set_auth_cookie_header("", max_age=0)},
+        )
+
+    def render_auth_page(
+        self,
+        mode: str,
+        error_message: str = "",
+        include_body: bool = True,
+    ) -> None:
+        is_setup = mode == "setup"
+        page = render_template(
+            "auth.html",
+            {
+                "AUTH_TITLE": "设置访问密码" if is_setup else "输入访问密码",
+                "AUTH_EYEBROW": "FIRST-TIME PROTECTION" if is_setup else "PRIVATE LIBRARY",
+                "AUTH_HINT": (
+                    "设置后，之后访问网站需要输入密码。密码只以不可逆哈希形式保存在本机数据库中。"
+                    if is_setup
+                    else "这是一个私人番剧库，请输入访问密码继续。"
+                ),
+                "AUTH_FORM_ACTION": "/auth/setup" if is_setup else "/auth/unlock",
+                "AUTH_SUBMIT_LABEL": "保存密码" if is_setup else "解锁馆藏",
+                "AUTH_PASSWORD_AUTOCOMPLETE": (
+                    "new-password" if is_setup else "current-password"
+                ),
+                "AUTH_CONFIRM_FIELD": (
+                    """
+                    <label class="auth-field">
+                      <span>确认密码</span>
+                      <input name="password_confirmation" type="password" required minlength="6" autocomplete="new-password">
+                    </label>
+                    """
+                    if is_setup
+                    else ""
+                ),
+                "ERROR_BANNER": (
+                    f'<p class="auth-error" role="alert">{html.escape(error_message)}</p>'
+                    if error_message
+                    else ""
+                ),
+            },
+        )
+        self.respond_html(page, include_body=include_body)
+
 
     def is_catalog_entry_available(self, anime: dict[str, Any]) -> bool:
         if str(anime.get("playback_mode", "online")) != "local":
@@ -180,11 +372,19 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
     ) -> None:
         catalog = self.combined_catalog()
         cards = "\n".join(render_card(anime) for anime in catalog)
+        password_configured = self.password_is_configured()
+        privacy_controls = f'''
+          <div class="privacy-controls">
+            <a class="privacy-link" href="/auth/setup">{'修改密码' if password_configured else '添加密码'}</a>
+            {'<form method="post" action="/auth/logout"><button class="privacy-lock" type="submit">锁定</button></form>' if password_configured else ''}
+          </div>
+        '''
         page = render_template(
             "index.html",
             {
                 "TOTAL_COUNT": str(len(catalog)),
                 "POSTER_CARDS": cards,
+                "PRIVACY_CONTROLS": privacy_controls,
             },
         )
         self.respond_html(page, include_body=include_body)
@@ -967,11 +1167,19 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 sources.append({"label": cleaned, "url": cleaned})
         return sources
 
-    def redirect(self, location: str, status: HTTPStatus) -> None:
+    def redirect(
+        self,
+        location: str,
+        status: HTTPStatus,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         location = quote(location, safe="/:?#[]@!$&'()*+,;=%-._~")
         self.send_response(status)
         self.send_header("Location", location)
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
 
     def respond_html(self, page: str, include_body: bool = True) -> None:

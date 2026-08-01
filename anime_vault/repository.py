@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import secrets
 import sqlite3
 import time
 from functools import lru_cache
@@ -8,6 +10,9 @@ from typing import Any
 
 from .config import DB_PATH, DEFAULT_MEDIA_LIBRARY_DIRS
 from .seed import CATALOG_SEED
+
+
+PASSWORD_HASH_ITERATIONS = 600_000
 
 
 def ensure_database() -> None:
@@ -102,6 +107,18 @@ def ensure_database() -> None:
             )
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS privacy_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                password_salt BLOB NOT NULL,
+                password_hash BLOB NOT NULL,
+                password_iterations INTEGER NOT NULL,
+                session_secret BLOB NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
         if not media_library_table_exists:
             connection.executemany(
                 "INSERT INTO media_library_directory (path, position) VALUES (?, ?)",
@@ -158,6 +175,65 @@ def ensure_database() -> None:
         )
         connection.commit()
     load_catalog.cache_clear()
+
+
+def load_privacy_settings() -> dict[str, Any] | None:
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM privacy_settings WHERE id = 1"
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def save_access_password(password: str) -> None:
+    salt = secrets.token_bytes(16)
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        PASSWORD_HASH_ITERATIONS,
+    )
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO privacy_settings (
+                id,
+                password_salt,
+                password_hash,
+                password_iterations,
+                session_secret,
+                updated_at
+            ) VALUES (1, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                password_salt = excluded.password_salt,
+                password_hash = excluded.password_hash,
+                password_iterations = excluded.password_iterations,
+                session_secret = excluded.session_secret,
+                updated_at = excluded.updated_at
+            """,
+            (
+                salt,
+                password_hash,
+                PASSWORD_HASH_ITERATIONS,
+                secrets.token_bytes(32),
+                time.time(),
+            ),
+        )
+        connection.commit()
+
+
+def verify_access_password(password: str) -> bool:
+    settings = load_privacy_settings()
+    if settings is None:
+        return False
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        bytes(settings["password_salt"]),
+        int(settings["password_iterations"]),
+    )
+    return secrets.compare_digest(password_hash, bytes(settings["password_hash"]))
 
 
 def ensure_column(
