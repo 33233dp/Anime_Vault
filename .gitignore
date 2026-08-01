@@ -14,28 +14,53 @@ env/
 .env.*
 !.env.example
 
-# Runtime data
-data/
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-*.log
-
-# Playlists may contain private or signed media URLs
+# Runtime and personal data
+/data/
+/poster/
+/Stills/
+/m3u8/
+/uploads/
+/media/
+*.db
+*.sqlite
+*.sqlite3
 *.m3u8
-
-# User-uploaded media should never be committed to the public repository
-poster/*
-Stills/*
+*.m3u
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.avif
+*.svg
+*.mp4
+*.m4v
+*.mkv
+*.webm
+*.mov
+*.avi
+*.flv
+*.ts
+*.mp3
+*.m4a
+*.flac
+*.wav
+*.srt
+*.ass
+*.log
 
 # Local backups and temporary files
 backup_*/
 docs_backup_*/
 metadata_cleanup_*/
+*.bak
 *.bak_*
+*.backup
 *.backup_*
 *.tmp
 *.temp
+*~
 
 # OS and editor files
 .DS_Store
