@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+MAX_PLAYLIST_SIZE = 2 * 1024 * 1024
+
+
+def parse_m3u8_upload(filename: str, payload: bytes) -> list[dict[str, str]]:
+    if Path(filename).suffix.lower() != ".m3u8":
+        raise ValueError("请选择 .m3u8 格式的播放列表文件。")
+    if not payload:
+        raise ValueError("上传的 M3U8 文件为空，请重新选择。")
+    if len(payload) > MAX_PLAYLIST_SIZE:
+        raise ValueError("M3U8 文件不能超过 2 MB。")
+
+    try:
+        content = payload.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("M3U8 文件必须使用 UTF-8 编码。") from exc
+
+    lines = [line.strip() for line in content.splitlines()]
+    if not lines or lines[0].upper() != "#EXTM3U":
+        raise ValueError("文件不是有效的 M3U8 播放列表：缺少 #EXTM3U。")
+
+    episodes: list[dict[str, str]] = []
+    pending_title = ""
+    for line in lines[1:]:
+        if not line:
+            continue
+        if line.startswith("#EXTINF:"):
+            _, separator, title = line.partition(",")
+            pending_title = title.strip() if separator else ""
+            continue
+        if line.startswith("#"):
+            continue
+
+        parsed = urlparse(line)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(
+                "M3U8 中的播放地址必须是完整的 HTTP 或 HTTPS 链接："
+                f"{line}"
+            )
+        episode_number = len(episodes) + 1
+        episodes.append(
+            {
+                "title": pending_title or f"第 {episode_number} 集",
+                "url": line,
+            }
+        )
+        pending_title = ""
+
+    if not episodes:
+        raise ValueError("M3U8 文件中没有找到可播放的 HTTP/HTTPS 地址。")
+    return episodes

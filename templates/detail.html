@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}} - Anime Vault</title>
+  <meta name="description" content="{{TITLE}} 的剧情简介、演员阵容与关键词。">
+  <link rel="stylesheet" href="/static/styles.css?v=20260628-mpv">
+  <script defer src="/static/app.js?v=20260630-online-order"></script>
+</head>
+<body class="detail-page">
+  <div class="detail-backdrop" style="background-image: url('{{BACKDROP_URL}}');"></div>
+  <div class="detail-overlay"></div>
+
+  <div class="page-shell page-shell--detail">
+    <header class="detail-nav">
+      <a class="back-link" href="{{BACK_LINK}}">返回海报墙</a>
+      <div class="detail-nav__actions">
+        <a class="detail-action-link" href="{{EDIT_LINK}}">编辑资料</a>
+        <p class="eyebrow">ANIME DETAIL</p>
+      </div>
+    </header>
+
+    <main class="detail-layout">
+      <section class="detail-hero">
+        <img class="detail-poster" src="{{POSTER_URL}}" alt="{{TITLE}} 海报">
+        <div class="detail-copy">
+          <p class="detail-copy__meta">{{RELEASE_INFO}}</p>
+          <h1>{{TITLE}}</h1>
+          <p class="detail-copy__subtitle">{{SUBTITLE}}</p>
+          <p class="detail-copy__studio">制作公司：{{STUDIO}}</p>
+          <p class="detail-copy__synopsis">{{SYNOPSIS}}</p>
+          {{PLAYBACK_SECTION}}
+        </div>
+      </section>
+
+      <section class="info-panel">
+        <div class="panel-card">
+          <h2>剧集演员</h2>
+          <ul class="chip-list chip-list--cast">
+            {{CAST_ITEMS}}
+          </ul>
+        </div>
+
+        <div class="panel-card">
+          <h2>关键词</h2>
+          <ul class="chip-list chip-list--keyword">
+            {{KEYWORD_ITEMS}}
+          </ul>
+        </div>
+
+        <div class="panel-card">
+          <h2>资料来源</h2>
+          <p class="panel-card__note">简介与演员信息基于官方站点及公开资料整理，关键词为基于剧情与设定的归纳总结。</p>
+          <ul class="source-list">
+            {{SOURCE_ITEMS}}
+          </ul>
+        </div>
+      </section>
+
+      {{EPISODE_SECTION}}
+    </main>
+  </div>
+</body>
+</html>

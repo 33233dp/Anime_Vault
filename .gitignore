@@ -1,0 +1,38 @@
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local configuration
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Runtime data
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+*.log
+
+# Local backups and temporary files
+backup_*/
+docs_backup_*/
+metadata_cleanup_*/
+*.bak_*
+*.backup_*
+*.tmp
+*.temp
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

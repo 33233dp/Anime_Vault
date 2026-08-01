@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{FORM_TITLE}} - Anime Vault</title>
+  <meta name="description" content="新增番剧配置页面。">
+  <link rel="stylesheet" href="/static/styles.css?v=20260730-m3u8-resource">
+  <script defer src="/static/app.js?v=20260730-m3u8-resource"></script>
+</head>
+<body class="anime-form-page">
+  <div class="page-shell">
+    <header class="detail-nav">
+      <a class="back-link" href="/">返回海报墙</a>
+      <p class="eyebrow">{{FORM_EYEBROW}}</p>
+    </header>
+
+    <main class="editor-layout">
+      <section class="editor-panel">
+        <div class="editor-panel__head">
+          <div>
+            <p class="section-head__eyebrow">{{FORM_PANEL_EYEBROW}}</p>
+            <h1>{{FORM_TITLE}}</h1>
+          </div>
+          <p class="editor-panel__hint">{{FORM_HINT}}</p>
+        </div>
+
+        {{ERROR_BANNER}}
+
+        <form class="editor-form" method="post" action="{{FORM_ACTION}}" enctype="multipart/form-data">
+          <section class="editor-section">
+            <div class="editor-section__head">
+              <h2>基本信息</h2>
+              <p>填写详情页展示所需的全部内容。</p>
+            </div>
+
+            <div class="editor-grid">
+              <label class="editor-field">
+                <span>唯一标识 slug</span>
+                <input name="slug" type="text" required value="{{SLUG}}" placeholder="例如 my-new-anime" {{SLUG_READONLY}}>
+              </label>
+              <label class="editor-field">
+                <span>番剧名</span>
+                <input name="title" type="text" required value="{{TITLE}}">
+              </label>
+              <label class="editor-field">
+                <span>副标题</span>
+                <input name="subtitle" type="text" value="{{SUBTITLE}}">
+              </label>
+              <label class="editor-field">
+                <span>发行信息</span>
+                <input name="release_info" type="text" value="{{RELEASE_INFO}}" placeholder="例如 2024 · Studio Name">
+              </label>
+              <label class="editor-field">
+                <span>制作公司</span>
+                <input name="studio" type="text" value="{{STUDIO}}">
+              </label>
+              <label class="editor-field editor-field--wide">
+                <span>海报路径 / 上传海报</span>
+                <input name="poster_path" type="text" value="{{POSTER_PATH}}" placeholder="poster/example.webp">
+                <div class="editor-upload" data-image-upload>
+                  <div class="editor-upload__dropzone" data-upload-dropzone>
+                    <input
+                      class="editor-upload__input"
+                      data-upload-input
+                      name="poster_file"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.avif,image/jpeg,image/png,image/gif,image/webp,image/bmp,image/svg+xml,image/avif"
+                    >
+                    <div class="editor-upload__content">
+                      <p class="editor-upload__title">拖入海报图片，或点击从当前设备选择文件</p>
+                      <p class="editor-upload__meta">支持 JPG、JPEG、PNG、GIF、WEBP、BMP、SVG、AVIF</p>
+                      <p class="editor-upload__status" data-upload-file>未选择文件</p>
+                    </div>
+                    <div class="editor-upload__preview" data-upload-preview hidden>
+                      <img class="editor-upload__preview-image" data-upload-preview-image alt="海报预览">
+                    </div>
+                  </div>
+                </div>
+              </label>
+              <label class="editor-field editor-field--wide">
+                <span>详情页剧照/背景图路径 / 上传剧照</span>
+                <input name="still_path" type="text" value="{{STILL_PATH}}" placeholder="Stills/example.webp">
+                <div class="editor-upload" data-image-upload>
+                  <div class="editor-upload__dropzone" data-upload-dropzone>
+                    <input
+                      class="editor-upload__input"
+                      data-upload-input
+                      name="still_file"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.svg,.avif,image/jpeg,image/png,image/gif,image/webp,image/bmp,image/svg+xml,image/avif"
+                    >
+                    <div class="editor-upload__content">
+                      <p class="editor-upload__title">拖入剧照/背景图，或点击从当前设备选择文件</p>
+                      <p class="editor-upload__meta">支持 JPG、JPEG、PNG、GIF、WEBP、BMP、SVG、AVIF</p>
+                      <p class="editor-upload__status" data-upload-file>未选择文件</p>
+                    </div>
+                    <div class="editor-upload__preview" data-upload-preview hidden>
+                      <img class="editor-upload__preview-image" data-upload-preview-image alt="剧照预览">
+                    </div>
+                  </div>
+                </div>
+              </label>
+              <label class="editor-field editor-field--wide">
+                <span>简介</span>
+                <textarea name="synopsis" rows="6">{{SYNOPSIS}}</textarea>
+              </label>
+              <label class="editor-field">
+                <span>剧集演员</span>
+                <textarea name="cast_text" rows="8" placeholder="每行一条，例如：&#10;主角 / 声优">{{CAST_TEXT}}</textarea>
+              </label>
+              <label class="editor-field">
+                <span>关键词</span>
+                <textarea name="keyword_text" rows="8" placeholder="每行一个关键词，或用逗号分隔">{{KEYWORD_TEXT}}</textarea>
+              </label>
+              <label class="editor-field editor-field--wide">
+                <span>资料来源</span>
+                <textarea name="source_text" rows="6" placeholder="每行一条，格式：标签 | URL">{{SOURCE_TEXT}}</textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="editor-section">
+            <div class="editor-section__head">
+              <h2>资源</h2>
+              <p>选择手工配置链接，或上传 M3U8 播放列表自动生成剧集。</p>
+            </div>
+
+            <div class="editor-grid">
+              <fieldset class="editor-field editor-field--wide playback-mode-field resource-type-field">
+                <legend>资源类型</legend>
+                <label>
+                  <input name="resource_type" type="radio" value="link" data-resource-type {{RESOURCE_LINK_CHECKED}}>
+                  <span>播放链接 / 路由</span>
+                </label>
+                <label>
+                  <input name="resource_type" type="radio" value="playlist" data-resource-type {{RESOURCE_PLAYLIST_CHECKED}}>
+                  <span>M3U8 文件</span>
+                </label>
+              </fieldset>
+              <input name="playback_mode" type="hidden" value="online">
+              <label class="editor-field editor-field--wide" data-resource-link>
+                <span>播放链接</span>
+                <input name="playback_url" type="url" inputmode="url" value="{{PLAYBACK_URL}}" placeholder="https://example.com/watch">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>总集数</span>
+                <input name="episode_count" type="number" min="0" step="1" value="{{EPISODE_COUNT}}">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>根域名</span>
+                <input name="episode_root_domain" type="text" value="{{EPISODE_ROOT_DOMAIN}}">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>路由</span>
+                <input name="episode_route" type="text" value="{{EPISODE_ROUTE}}">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>查询参数前缀</span>
+                <input name="episode_query_prefix" type="text" value="{{EPISODE_QUERY_PREFIX}}">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>集数查询偏移</span>
+                <input name="episode_start_number" type="number" step="1" value="{{EPISODE_START_NUMBER}}">
+              </label>
+              <label class="editor-field" data-resource-link>
+                <span>集数</span>
+                <input type="text" value="自动生成" readonly>
+              </label>
+              <label class="editor-field editor-field--wide" data-resource-link>
+                <span>其他</span>
+                <input name="episode_other" type="text" value="{{EPISODE_OTHER}}">
+              </label>
+              <div class="editor-field editor-field--wide playlist-upload" data-resource-playlist>
+                <span>M3U8 播放列表</span>
+                <label class="playlist-upload__dropzone" data-playlist-dropzone data-state="idle">
+                  <input class="playlist-upload__input" name="playlist_file" type="file" accept=".m3u8,application/vnd.apple.mpegurl,application/x-mpegURL,audio/mpegurl" data-playlist-input>
+                  <span class="playlist-upload__icon" aria-hidden="true">M3U8</span>
+                  <span class="playlist-upload__copy">
+                    <strong>选择或拖入 .m3u8 文件</strong>
+                    <small data-playlist-status>{{PLAYLIST_FILE_STATUS}}</small>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <div class="editor-actions">
+            <button class="editor-submit" type="submit">{{SUBMIT_LABEL}}</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
