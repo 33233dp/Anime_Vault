@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import cgi
 import hashlib
 import hmac
 import html
 import json
+from email import policy
+from email.parser import BytesParser
 import os
 import re
 import time
@@ -1253,27 +1254,33 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
     def read_multipart_form_data(
         self,
     ) -> tuple[dict[str, list[str]], dict[str, dict[str, Any]]]:
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0") or "0",
-            },
-            keep_blank_values=True,
-        )
+        content_length = int(self.headers.get("Content-Length", "0") or 0)
+        payload = self.rfile.read(content_length) if content_length else b""
+        # The stdlib email parser replaces the removed cgi.FieldStorage in Python 3.13.
+        raw_message = (
+            f"Content-Type: {self.headers.get('Content-Type', '')}\r\n"
+            "MIME-Version: 1.0\r\n\r\n"
+        ).encode("ascii", "replace") + payload
+        form = BytesParser(policy=policy.default).parsebytes(raw_message)
         fields: dict[str, list[str]] = {}
         files: dict[str, dict[str, Any]] = {}
-        for item in form.list or []:
-            if item.filename:
-                files[item.name] = {
-                    "filename": item.filename,
-                    "content_type": item.type or "",
-                    "data": item.file.read(),
+        if not form.is_multipart():
+            return fields, files
+        for item in form.iter_parts():
+            disposition = item.get_content_disposition()
+            name = item.get_param("name", header="content-disposition")
+            if not name or disposition != "form-data":
+                continue
+            filename = item.get_filename()
+            if filename:
+                files[name] = {
+                    "filename": filename,
+                    "content_type": item.get_content_type() or "",
+                    "data": item.get_payload(decode=True) or b"",
                 }
                 continue
-            fields.setdefault(item.name, []).append(item.value)
+            value = item.get_content()
+            fields.setdefault(name, []).append(str(value))
         return fields, files
 
     def has_uploaded_file(self, uploaded_file: dict[str, Any] | None) -> bool:
