@@ -18,6 +18,7 @@ Anime Vault 是一个面向个人使用的本地番剧观看管理网页。它�
 - 配置剧集 URL 拼接规则
 - 上传 `.m3u8` 播放列表并自动生成剧集
 - 点击剧集后跳转到拼接后的播放地址
+- 提供 Animeko 可导入的 JSON/CSS Selector 规则接口
 - 记录并高亮上一次播放的集数
 - 首页设置个人访问密码，后续访问需要解锁，无需注册帐号
 - 启动时自动创建和迁移 SQLite 数据库字段
@@ -192,6 +193,51 @@ data/anime.db
 ```text
 https://example.com/watch?ep=0&from=anime
 ```
+
+## Animeko 规则导入
+
+项目提供只读的 Animeko 订阅配置接口。Animeko 添加规则时，直接添加下面的订阅地址（它返回
+Animeko 要求的 `exportedMediaSourceDataList` 对象）：
+
+```text
+http://127.0.0.1:8000/animeko/subscription?token={换成启动时设置的token}
+```
+
+也可以手动创建 Selector 规则。搜索地址设置为：
+
+```text
+http://运行设备IP:8000/animeko/search?keyword={keyword}
+```
+
+搜索结果使用 JSON 格式。详情页地址由搜索结果返回，Animeko 使用 CSS Selector `a.animeko-episode`
+提取剧集名称和链接即可。规则类型选择 `Selector`，条目格式选择 `JSON Path Indexed`：
+
+```json
+{
+  "selectLinks": "$[*]['url','link']",
+  "selectNames": "$[*]['title','name']"
+}
+```
+
+剧集格式选择 `No Channel`，剧集选择器填写 `a.animeko-episode`，名称使用元素文本，链接使用元素的
+`href` 属性。适配接口会为每个剧集输出独立的“第 N 集”文本，保证 Animeko 能识别分集编号；原始
+M3U8 标题保存在链接的 `title` 属性中，不会干扰集数解析。Animeko
+请求详情页后即可显示本网站中配置的在线路由、M3U8 分集以及本地媒体。
+
+启用网站访问密码时，先在启动服务的环境变量中设置接口令牌：
+
+```bash
+ANIMEKO_API_TOKEN='请替换为随机长字符串' python3 app.py
+```
+
+然后把同一个令牌追加到规则地址（搜索地址和详情地址会自动携带）：
+
+```text
+http://运行设备IP:8000/animeko/search?token=令牌&keyword={keyword}
+```
+
+令牌只用于 Animeko 只读接口，不会改变网页端密码。建议仅在可信局域网使用，并通过 HTTPS、VPN 或
+SSH 隧道传输。
 
 ## 新增和编辑番剧
 

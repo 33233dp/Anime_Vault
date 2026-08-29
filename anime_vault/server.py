@@ -4,6 +4,8 @@ import cgi
 import hashlib
 import hmac
 import html
+import json
+import os
 import re
 import time
 from http import HTTPStatus
@@ -16,6 +18,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 from .config import BASE_DIR, POSTER_DIR, STILLS_DIR
 from .media import (
     episode_file_for_number,
+    list_video_files,
     resolve_media_directory,
     video_mime_type,
 )
@@ -137,6 +140,17 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
     def handle_dynamic_route(self, include_body: bool) -> bool:
         parsed = urlparse(self.path)
         route = unquote(parsed.path)
+        if route in {"/animeko/subscription", "/animeko/subscription.json"}:
+            self.animeko_subscription(include_body)
+            return True
+        if route == "/animeko/search":
+            self.animeko_search(include_body)
+            return True
+        if route.startswith("/animeko/anime/"):
+            slug = route.removeprefix("/animeko/anime/").strip("/")
+            if slug:
+                self.animeko_detail(slug, include_body)
+                return True
         if route == "/":
             self.render_home(include_body=include_body)
             return True
@@ -186,6 +200,135 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 return True
         return False
 
+    def animeko_url_token(self) -> str:
+        token = parse_qs(urlparse(self.path).query).get("token", [""])[0].strip()
+        return f"&token={quote(token)}" if token else ""
+
+    def animeko_base_url(self) -> str:
+        forwarded = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0].strip()
+        host = self.headers.get("Host", "127.0.0.1:8000")
+        return f"{forwarded}://{host}".rstrip("/")
+
+    def animeko_search(self, include_body: bool = True) -> None:
+        if not include_body:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        query = parse_qs(urlparse(self.path).query).get("keyword", [""])[0].strip().casefold()
+        token_suffix = self.animeko_url_token()
+        results = []
+        for anime in load_catalog():
+            haystack = " ".join(
+                [str(anime.get("title", "")), str(anime.get("subtitle", ""))]
+                + [str(value) for value in anime.get("keywords", [])]
+            ).casefold()
+            if query and query not in haystack:
+                continue
+            slug = quote(str(anime["slug"]), safe="")
+            results.append(
+                {
+                    "title": str(anime.get("title", anime["slug"])),
+                    "name": str(anime.get("title", anime["slug"])),
+                    "url": f"{self.animeko_base_url()}/animeko/anime/{slug}{('?token=' + quote(parse_qs(urlparse(self.path).query).get('token', [''])[0])) if token_suffix else ''}",
+                }
+            )
+        self.respond_json(results)
+
+    def animeko_subscription(self, include_body: bool = True) -> None:
+        """Return an Animeko ExportedMediaSourceData subscription document."""
+        if not include_body:
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        parsed = urlparse(self.path)
+        token = parse_qs(parsed.query).get("token", [""])[0].strip()
+        token_query = f"?token={quote(token)}&keyword={{keyword}}" if token else "?keyword={{keyword}}"
+        base = self.animeko_base_url()
+        arguments = {
+            "name": "Anime Vault",
+            "description": "Anime Vault 本地番剧资源",
+            "iconUrl": f"{base}/static/favicon.ico",
+            "tier": 0,
+            "channelTiers": {},
+            "searchConfig": {
+                "searchUrl": f"{base}/animeko/search{token_query}",
+                "searchUseOnlyFirstWord": False,
+                "searchRemoveSpecial": False,
+                "searchUseSubjectNamesCount": 1,
+                "rawBaseUrl": base,
+                "subjectFormatId": "json-path-indexed",
+                "selectorSubjectFormatJsonPathIndexed": {
+                    "selectLinks": "$[*]['url','link']",
+                    "selectNames": "$[*]['title','name']",
+                    "preferShorterName": True,
+                },
+                "channelFormatId": "no-channel",
+                "selectorChannelFormatNoChannel": {
+                    "selectEpisodes": "a.animeko-episode",
+                    "selectEpisodeLinks": "",
+                    "matchEpisodeSortFromName": "第\\s*(?<ep>\\d+)\\s*[话集]",
+                },
+                "filterByEpisodeSort": True,
+                "filterBySubjectName": True,
+                "selectMedia": {"distinguishSubjectName": True, "distinguishChannelName": False},
+                "matchVideo": {
+                    "enableNestedUrl": True,
+                    "matchNestedUrl": "^.+(m3u8|vip|xigua\\.php).+\\?",
+                    "matchVideoUrl": "^http(s)?://.+",
+                    "cookies": "",
+                    "addHeadersToVideo": {"referer": "", "userAgent": ""},
+                },
+                "defaultResolution": "1080P",
+                "defaultSubtitleLanguage": "ChineseSimplified",
+            },
+        }
+        self.respond_json({
+            "exportedMediaSourceDataList": {
+                "mediaSources": [{"factoryId": "web-selector", "version": 2, "arguments": arguments}]
+            }
+        })
+
+    def animeko_detail(self, slug: str, include_body: bool = True) -> None:
+        anime = get_anime(slug)
+        if anime is None:
+            self.send_error(HTTPStatus.NOT_FOUND, "Anime not found")
+            return
+        token_suffix = self.animeko_url_token()
+        mode = str(anime.get("playback_mode", "online"))
+        if mode == "local":
+            count = len(list_video_files(str(anime.get("local_media_dir", ""))))
+        elif anime.get("resource_type") == "playlist":
+            count = len(anime.get("playlist_episodes", []))
+        else:
+            count = int(anime.get("episode_count") or 0)
+        items = []
+        for episode in range(1, count + 1):
+            if mode == "local":
+                href = f"{self.animeko_base_url()}/anime/{quote(slug, safe='')}/local-episode/{episode}{('?' + token_suffix.removeprefix('&')) if token_suffix else ''}"
+            else:
+                href = compose_episode_url(anime, episode)
+                if not href:
+                    continue
+            title = ""
+            if anime.get("resource_type") == "playlist":
+                title = str(anime.get("playlist_episodes", [])[episode - 1].get("title", "") or "")
+            # Keep the visible text limited to a canonical episode label. Animeko's
+            # default greedy episode regex otherwise captures a later "集" in the
+            # original M3U8 title (for example, "第 1 集 · ...第一集").
+            label = f"第 {episode} 集"
+            title_attr = f' title="{html.escape(title, quote=True)}"' if title else ""
+            items.append(
+                f'<a class="animeko-episode" href="{html.escape(href, quote=True)}"{title_attr}>{label}</a>'
+            )
+        page = """<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>{title}</title></head><body><main><h1>{title}</h1><div class="animeko-episodes">{episodes}</div></main></body></html>""".format(
+            title=html.escape(str(anime.get("title", slug))), episodes="".join(items)
+        )
+        self.respond_html(page, include_body=include_body)
+
     def password_is_configured(self) -> bool:
         return load_privacy_settings() is not None
 
@@ -220,6 +363,16 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
 
     def handle_authentication_gate(self) -> bool:
         route = unquote(urlparse(self.path).path)
+        if route.startswith("/animeko/"):
+            if self.animeko_authorized():
+                return False
+            self.respond_json({"error": "Animeko API authentication required"}, HTTPStatus.UNAUTHORIZED)
+            return True
+        if "/local-episode/" in route and self.animeko_token_present():
+            if self.animeko_authorized():
+                return False
+            self.respond_json({"error": "Animeko API authentication required"}, HTTPStatus.UNAUTHORIZED)
+            return True
         if route in {
             "/static/styles.css",
             "/static/app.js",
@@ -234,6 +387,32 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         else:
             self.redirect("/", HTTPStatus.FOUND)
         return True
+
+    def animeko_token_present(self) -> bool:
+        parsed = urlparse(self.path)
+        return bool(
+            parse_qs(parsed.query).get("token", [""])[0]
+            or self.headers.get("X-Animeko-Token", "")
+            or self.headers.get("Authorization", "")
+        )
+
+    def animeko_authorized(self) -> bool:
+        """Allow Animeko access without a browser cookie when a token is configured."""
+        if not self.password_is_configured() or self.has_valid_auth_session():
+            return True
+        configured = os.environ.get("ANIMEKO_API_TOKEN", "").strip()
+        if not configured:
+            return False
+        parsed = urlparse(self.path)
+        query_token = parse_qs(parsed.query).get("token", [""])[0]
+        header_token = self.headers.get("X-Animeko-Token", "")
+        authorization = self.headers.get("Authorization", "")
+        bearer = authorization.removeprefix("Bearer ").strip()
+        return any(
+            hmac.compare_digest(candidate, configured)
+            for candidate in (query_token, header_token, bearer)
+            if candidate
+        )
 
     def auth_cookie_value(self) -> str:
         settings = load_privacy_settings()
@@ -1200,6 +1379,15 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         if include_body:
             self.wfile.write(payload)
+
+    def respond_json(self, payload: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, format: str, *args: Any) -> None:
         return
