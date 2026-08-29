@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{FORM_TITLE}} - Anime Vault</title>
   <meta name="description" content="新增番剧配置页面。">
-  <link rel="stylesheet" href="/static/styles.css?v=20260730-m3u8-resource">
-  <script defer src="/static/app.js?v=20260730-m3u8-resource"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20260829-resource-mode-delete">
+  <script defer src="/static/app.js?v=20260829-resource-mode-delete"></script>
 </head>
 <body class="anime-form-page">
   <div class="page-shell">
@@ -174,6 +174,11 @@
               <label class="editor-field editor-field--wide" data-resource-link>
                 <span>其他</span>
                 <input name="episode_other" type="text" value="{{EPISODE_OTHER}}">
+              </label>
+              <label class="editor-field" data-resource-import-offset>
+                <span>导入集数显示偏移</span>
+                <input name="playlist_episode_offset" type="number" min="0" step="1" value="{{PLAYLIST_EPISODE_OFFSET}}">
+                <small class="editor-field__hint">例如设置为 3，第一条视频显示为第四集。</small>
               </label>
               <div class="editor-field editor-field--wide playlist-upload" data-resource-playlist>
                 <span>M3U8 播放列表</span>

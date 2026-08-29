@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{TITLE}} - Anime Vault</title>
   <meta name="description" content="{{TITLE}} 的剧情简介、演员阵容与关键词。">
-  <link rel="stylesheet" href="/static/styles.css?v=20260628-mpv">
-  <script defer src="/static/app.js?v=20260630-online-order"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20260829-resource-mode-delete">
+  <script defer src="/static/app.js?v=20260829-resource-mode-delete"></script>
 </head>
 <body class="detail-page">
   <div class="detail-backdrop" style="background-image: url('{{BACKDROP_URL}}');"></div>
@@ -17,6 +17,9 @@
       <a class="back-link" href="{{BACK_LINK}}">返回海报墙</a>
       <div class="detail-nav__actions">
         <a class="detail-action-link" href="{{EDIT_LINK}}">编辑资料</a>
+        <form class="detail-delete-form" method="post" action="{{DELETE_ACTION}}" data-delete-form data-anime-title="{{DELETE_TITLE}}">
+          <button class="detail-delete-button" type="submit">删除番剧</button>
+        </form>
         <p class="eyebrow">ANIME DETAIL</p>
       </div>
     </header>

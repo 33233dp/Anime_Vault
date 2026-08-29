@@ -27,6 +27,7 @@ from .playlists import convert_urls_to_m3u8, parse_m3u8_upload
 from .renderers import (
     asset_url,
     compose_episode_url,
+    display_episode_number,
     local_placeholder_url,
     render_anime_form_page,
     render_card,
@@ -39,6 +40,7 @@ from .renderers import (
 from .repository import (
     anime_exists,
     create_anime,
+    delete_anime,
     get_anime,
     load_catalog,
     load_playback_activity,
@@ -116,6 +118,11 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         if route == "/anime/create":
             self.create_anime_entry()
             return
+        if route.startswith("/anime/") and route.endswith("/delete"):
+            slug = route.removeprefix("/anime/").removesuffix("/delete").strip("/")
+            if slug:
+                self.delete_anime_entry(slug)
+                return
         if route.startswith("/anime/") and route.endswith("/edit"):
             slug = route.removeprefix("/anime/").removesuffix("/edit").strip("/")
             if slug:
@@ -209,6 +216,14 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         forwarded = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0].strip()
         host = self.headers.get("Host", "127.0.0.1:8000")
         return f"{forwarded}://{host}".rstrip("/")
+
+    def animeko_subscription_url(self) -> str:
+        host = self.headers.get("Host", "127.0.0.1:8000")
+        hostname = urlparse(f"//{host}").hostname or "127.0.0.1"
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
+        token = quote(os.environ.get("ANIMEKO_API_TOKEN", "").strip(), safe="")
+        return f"http://{hostname}:8000/animeko/subscription?token={token}"
 
     def animeko_search(self, include_body: bool = True) -> None:
         if not include_body:
@@ -320,7 +335,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             # Keep the visible text limited to a canonical episode label. Animeko's
             # default greedy episode regex otherwise captures a later "集" in the
             # original M3U8 title (for example, "第 1 集 · ...第一集").
-            label = f"第 {episode} 集"
+            label = f"第 {display_episode_number(anime, episode)} 集"
             title_attr = f' title="{html.escape(title, quote=True)}"' if title else ""
             items.append(
                 f'<a class="animeko-episode" href="{html.escape(href, quote=True)}"{title_attr}>{label}</a>'
@@ -566,6 +581,9 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 "TOTAL_COUNT": str(len(catalog)),
                 "POSTER_CARDS": cards,
                 "PRIVACY_CONTROLS": privacy_controls,
+                "ANIMEKO_SUBSCRIPTION_URL": html.escape(
+                    self.animeko_subscription_url(), quote=True
+                ),
             },
         )
         self.respond_html(page, include_body=include_body)
@@ -619,9 +637,18 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 "SOURCE_ITEMS": render_source_list(anime["sources"]),
                 "BACK_LINK": "/",
                 "EDIT_LINK": f"/anime/{quote(anime['slug'])}/edit",
+                "DELETE_ACTION": f"/anime/{quote(anime['slug'])}/delete",
+                "DELETE_TITLE": html.escape(str(anime.get("title", slug)), quote=True),
             },
         )
         self.respond_html(page, include_body=include_body)
+
+
+    def delete_anime_entry(self, slug: str) -> None:
+        if not delete_anime(slug):
+            self.send_error(HTTPStatus.NOT_FOUND, "Anime not found")
+            return
+        self.redirect("/", HTTPStatus.SEE_OTHER)
 
 
     def update_playback_url(self, slug: str) -> None:
@@ -700,6 +727,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             "episode_route": field("episode_route"),
             "episode_query_prefix": field("episode_query_prefix"),
             "episode_start_number": field("episode_start_number", "1"),
+            "playlist_episode_offset": field("playlist_episode_offset", "0"),
             "episode_other": field("episode_other"),
         }
         if existing_slug:
@@ -747,6 +775,10 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             episode_start_number = int(values["episode_start_number"] or "1")
         except ValueError:
             episode_start_number = 1
+        try:
+            playlist_episode_offset = max(0, int(values["playlist_episode_offset"] or "0"))
+        except ValueError:
+            playlist_episode_offset = 0
 
         playlist_episodes: list[dict[str, str]] = []
         playlist_name = ""
@@ -764,7 +796,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                 try:
                     playlist_name = f"{values['title'] or values['slug']}.m3u8"
                     generated_playlist = convert_urls_to_m3u8(
-                        values["url_list_text"], values["title"]
+                        values["url_list_text"], values["title"], playlist_episode_offset
                     )
                     playlist_episodes = parse_m3u8_upload(playlist_name, generated_playlist)
                 except ValueError as exc:
@@ -816,6 +848,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             "episode_route": values["episode_route"],
             "episode_query_prefix": values["episode_query_prefix"],
             "episode_start_number": episode_start_number,
+            "playlist_episode_offset": playlist_episode_offset,
             "episode_other": values["episode_other"],
             "resource_type": "playlist" if values["resource_type"] in {"playlist", "url_list"} else values["resource_type"],
             "playlist_name": playlist_name or values["playlist_name"],
@@ -853,6 +886,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             "episode_route": str(anime.get("episode_route", "")),
             "episode_query_prefix": str(anime.get("episode_query_prefix", "")),
             "episode_start_number": str(anime.get("episode_start_number") or 1),
+            "playlist_episode_offset": str(anime.get("playlist_episode_offset") or 0),
             "episode_other": str(anime.get("episode_other", "")),
         }
 
@@ -985,7 +1019,9 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         # 对于 playlist 类型的资源，渲染内嵌播放器页面
         if anime.get("resource_type") == "playlist":
             title = html.escape(str(anime.get("title", slug)))
-            ep_title = html.escape(f"第 {episode_number} 集")
+            ep_title = html.escape(
+                f"第 {display_episode_number(anime, episode_number)} 集"
+            )
             video_url = html.escape(target_url, quote=True)
             prev_link = ""
             next_link = ""
@@ -1105,7 +1141,8 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
 '''
             for i in range(1, episode_count + 1):
                 active = "active" if i == episode_number else ""
-                page += '<a href="/anime/' + quote(slug) + '/episode/' + str(i) + '" class="ep-btn ' + active + '">' + str(i) + '</a>'
+                display_episode = display_episode_number(anime, i)
+                page += '<a href="/anime/' + quote(slug) + '/episode/' + str(i) + '" class="ep-btn ' + active + '">' + str(display_episode) + '</a>'
             page += '''    </div>
   </div>
   <script>
@@ -1291,7 +1328,18 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                     "data": item.get_payload(decode=True) or b"",
                 }
                 continue
-            value = item.get_content()
+            # Browsers commonly omit a charset on multipart text fields.  The
+            # payload is still UTF-8, but email.message would otherwise decode
+            # it as ASCII and replace every Chinese byte with U+FFFD.
+            raw_value = item.get_payload(decode=True)
+            if raw_value is not None:
+                charset = item.get_content_charset() or "utf-8"
+                try:
+                    value = raw_value.decode(charset)
+                except (LookupError, UnicodeDecodeError):
+                    value = raw_value.decode("utf-8", errors="replace")
+            else:
+                value = item.get_content()
             fields.setdefault(name, []).append(str(value))
         return fields, files
 

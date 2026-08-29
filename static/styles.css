@@ -379,8 +379,10 @@ textarea {
 }
 
 .quick-create-link,
+.subscription-copy-button,
 .back-link,
 .detail-action-link,
+.detail-delete-button,
 .playback-form__button,
 .episodes-panel__config-toggle,
 .episodes-config__save,
@@ -401,6 +403,7 @@ textarea {
 }
 
 .quick-create-link::before,
+.subscription-copy-button::before,
 .detail-action-link::before,
 .editor-submit::before {
   content: "✦";
@@ -408,12 +411,31 @@ textarea {
   font-size: 0.95em;
 }
 
+.subscription-copy-button {
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+.subscription-copy-button::before {
+  content: "⧉";
+}
+
+.detail-delete-button {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, #d95d7d, #a83f62);
+  cursor: pointer;
+}
+
 .quick-create-link:hover,
 .quick-create-link:focus-visible,
+.subscription-copy-button:hover,
+.subscription-copy-button:focus-visible,
 .back-link:hover,
 .back-link:focus-visible,
 .detail-action-link:hover,
 .detail-action-link:focus-visible,
+.detail-delete-button:hover,
+.detail-delete-button:focus-visible,
 .playback-form__button:hover,
 .playback-form__button:focus-visible,
 .episodes-panel__config-toggle:hover,
@@ -1927,8 +1949,10 @@ textarea {
   }
 
   .quick-create-link,
+  .subscription-copy-button,
   .back-link,
   .detail-action-link,
+  .detail-delete-button,
   .playback-form__button,
   .episodes-panel__config-toggle,
   .episodes-config__save,

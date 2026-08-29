@@ -139,6 +139,9 @@ def render_anime_form_page(
         "EPISODE_START_NUMBER": html.escape(
             values.get("episode_start_number", "1"), quote=True
         ),
+        "PLAYLIST_EPISODE_OFFSET": html.escape(
+            values.get("playlist_episode_offset", "0"), quote=True
+        ),
         "EPISODE_OTHER": html.escape(values.get("episode_other", ""), quote=True),
     }
     return render_template("anime_form.html", context)
@@ -214,6 +217,19 @@ def episode_start_number(anime: dict[str, Any]) -> int:
     if raw_value in (None, ""):
         return 1
     return int(raw_value)
+
+
+def playlist_episode_offset(anime: dict[str, Any]) -> int:
+    try:
+        return max(0, int(anime.get("playlist_episode_offset", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def display_episode_number(anime: dict[str, Any], episode_number: int) -> int:
+    if anime.get("resource_type") == "playlist":
+        return episode_number + playlist_episode_offset(anime)
+    return episode_number
 
 
 def compose_episode_url(anime: dict[str, Any], episode_number: int) -> str:
@@ -524,14 +540,15 @@ def render_episode_section(anime: dict[str, Any]) -> str:
             episode_items.append(
                 """
                 <a class="episode-card{active}" href="/anime/{slug}/episode/{episode}" target="_blank" rel="noreferrer noopener" title="{title}">
-                  <span class="episode-card__roman">{episode}</span>
-                  <span class="episode-card__label">第 {episode} 集</span>
+                  <span class="episode-card__roman">{display_episode}</span>
+                  <span class="episode-card__label">第 {display_episode} 集</span>
                   {title_markup}
                 </a>
                 """.strip().format(
                     active=active,
                     slug=quote(anime["slug"]),
                     episode=episode_number,
+                    display_episode=display_episode_number(anime, episode_number),
                     title=html.escape(episode_title, quote=True),
                     title_markup=title_markup,
                 )
@@ -600,9 +617,10 @@ def render_episode_section(anime: dict[str, Any]) -> str:
         </div>
         """.strip()
 
-    last_label = str(last_played) if last_played > 0 else "未播放"
+    last_label = str(display_episode_number(anime, last_played)) if last_played > 0 else "未播放"
     episode_count_value = str(count) if count > 0 else "0"
     start_number_value = str(episode_start_number(anime))
+    playlist_offset_value = str(playlist_episode_offset(anime))
     components = episode_url_components(anime)
     online_checked = "selected" if mode == "online" else ""
     local_checked = "selected" if mode == "local" else ""

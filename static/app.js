@@ -3,6 +3,68 @@ const posterGrid = document.getElementById("posterGrid");
 const visibleCount = document.getElementById("visibleCount");
 const emptyState = document.getElementById("emptyState");
 
+document.querySelectorAll("[data-copy-subscription]").forEach((button) => {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const originalLabel = button.textContent;
+  let resetTimer;
+
+  const copyText = async (value) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    if (!copied) {
+      throw new Error("Clipboard copy failed");
+    }
+  };
+
+  button.addEventListener("click", async () => {
+    const value = button.dataset.copyValue || "";
+    if (!value) {
+      return;
+    }
+
+    window.clearTimeout(resetTimer);
+    try {
+      await copyText(value);
+      button.textContent = "已复制 Animeko 订阅";
+      resetTimer = window.setTimeout(() => {
+        button.textContent = originalLabel;
+      }, 1800);
+    } catch {
+      button.textContent = "复制失败，请手动复制";
+      resetTimer = window.setTimeout(() => {
+        button.textContent = originalLabel;
+      }, 2400);
+    }
+  });
+});
+
+document.querySelectorAll("[data-delete-form]").forEach((form) => {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  form.addEventListener("submit", (event) => {
+    const title = form.dataset.animeTitle || "这部番剧";
+    if (!window.confirm(`确定删除“${title}”吗？删除后不可恢复。`)) {
+      event.preventDefault();
+    }
+  });
+});
+
 if (searchInput && posterGrid && visibleCount && emptyState) {
   const cards = Array.from(posterGrid.querySelectorAll(".poster-card"));
 
@@ -282,6 +344,9 @@ const syncResourceTypeControls = (form) => {
     });
     form.querySelectorAll("[data-resource-url-list]").forEach((field) => {
       field.hidden = !urlListSelected;
+    });
+    form.querySelectorAll("[data-resource-import-offset]").forEach((field) => {
+      field.hidden = !(playlistSelected || urlListSelected);
     });
   };
 

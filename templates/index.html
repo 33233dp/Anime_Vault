@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anime Vault</title>
   <meta name="description" content="番剧观看管理网页，提供海报墙与详情页浏览体验。">
-  <link rel="stylesheet" href="/static/styles.css?v=20260730-m3u8-resource">
-  <script defer src="/static/app.js?v=20260622-auto-next-local"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20260829-animeko-subscription">
+  <script defer src="/static/app.js?v=20260829-animeko-subscription"></script>
 </head>
 <body class="catalog-page">
   <div class="page-shell">
@@ -24,6 +24,12 @@
           <input id="searchInput" type="search" placeholder="输入标题、题材或关键词">
         </label>
         <a class="quick-create-link" href="/anime/new" target="_blank" rel="noreferrer">新增番剧</a>
+        <button
+          class="subscription-copy-button"
+          type="button"
+          data-copy-subscription=""
+          data-copy-value="{{ANIMEKO_SUBSCRIPTION_URL}}"
+        >一键复制animeko订阅</button>
         {{PRIVACY_CONTROLS}}
         <p class="hero__hint">搜索会即时过滤海报，不刷新页面。</p>
       </div>

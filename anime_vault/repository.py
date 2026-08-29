@@ -51,6 +51,7 @@ def ensure_database() -> None:
                 resource_type TEXT NOT NULL DEFAULT 'link',
                 playlist_name TEXT NOT NULL DEFAULT '',
                 playlist_episodes_json TEXT NOT NULL DEFAULT '[]',
+                playlist_episode_offset INTEGER NOT NULL DEFAULT 0,
                 last_played_episode INTEGER NOT NULL DEFAULT 0
             )
             """
@@ -74,6 +75,9 @@ def ensure_database() -> None:
         ensure_column(connection, "anime", "playlist_name", "TEXT NOT NULL DEFAULT ''")
         ensure_column(
             connection, "anime", "playlist_episodes_json", "TEXT NOT NULL DEFAULT '[]'"
+        )
+        ensure_column(
+            connection, "anime", "playlist_episode_offset", "INTEGER NOT NULL DEFAULT 0"
         )
         ensure_column(
             connection, "anime", "last_played_episode", "INTEGER NOT NULL DEFAULT 0"
@@ -323,8 +327,9 @@ def create_anime(record: dict[str, Any]) -> None:
                 resource_type,
                 playlist_name,
                 playlist_episodes_json,
+                playlist_episode_offset,
                 last_played_episode
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["slug"],
@@ -350,6 +355,7 @@ def create_anime(record: dict[str, Any]) -> None:
                 record["resource_type"],
                 record["playlist_name"],
                 json.dumps(record["playlist_episodes"], ensure_ascii=False),
+                record["playlist_episode_offset"],
                 record["last_played_episode"],
             ),
         )
@@ -393,6 +399,7 @@ def update_anime(slug: str, record: dict[str, Any]) -> None:
                 resource_type = ?,
                 playlist_name = ?,
                 playlist_episodes_json = ?,
+                playlist_episode_offset = ?,
                 last_played_episode = ?
             WHERE slug = ?
             """,
@@ -419,12 +426,30 @@ def update_anime(slug: str, record: dict[str, Any]) -> None:
                 record["resource_type"],
                 record["playlist_name"],
                 json.dumps(record["playlist_episodes"], ensure_ascii=False),
+                record["playlist_episode_offset"],
                 last_played,
                 slug,
             ),
         )
         connection.commit()
     load_catalog.cache_clear()
+
+
+def delete_anime(slug: str) -> bool:
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            "DELETE FROM episode_playback_progress WHERE slug = ?",
+            (slug,),
+        )
+        connection.execute(
+            "DELETE FROM anime_playback_activity WHERE slug = ?",
+            (slug,),
+        )
+        cursor = connection.execute("DELETE FROM anime WHERE slug = ?", (slug,))
+        deleted = cursor.rowcount > 0
+        connection.commit()
+    load_catalog.cache_clear()
+    return deleted
 
 
 def save_playback_url(slug: str, playback_url: str) -> None:

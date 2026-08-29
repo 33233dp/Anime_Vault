@@ -23,14 +23,20 @@ def to_chinese_num(number: int) -> str:
     return str(number)
 
 
-def convert_urls_to_m3u8(url_text: str, prefix: str = "") -> bytes:
+def convert_urls_to_m3u8(
+    url_text: str, prefix: str = "", episode_offset: int = 0
+) -> bytes:
     """Generate the same M3U8 payload as convert_to_m3u8.py."""
+    try:
+        episode_offset = max(0, int(episode_offset))
+    except (TypeError, ValueError):
+        episode_offset = 0
     urls = [line.strip() for line in url_text.splitlines() if line.strip()]
     if not urls:
         raise ValueError("未提供任何 URL，请每行填写一个播放地址。")
     lines = ["#EXTM3U"]
     for index, url in enumerate(urls, start=1):
-        episode = to_chinese_num(index)
+        episode = to_chinese_num(index + episode_offset)
         title = f"{prefix}-第{episode}集" if prefix else f"第{episode}集"
         lines.extend([f"#EXTINF:-1,{title}", url])
     return ("\n".join(lines) + "\n").encode("utf-8")

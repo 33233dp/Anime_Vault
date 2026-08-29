@@ -20,6 +20,26 @@ class ParseM3U8UploadTests(unittest.TestCase):
         episodes = parse_m3u8_upload("generated.m3u8", payload)
         self.assertEqual(episodes[1]["title"], "我推的孩子-第二集")
 
+    def test_convert_urls_applies_episode_offset_to_generated_titles(self) -> None:
+        payload = convert_urls_to_m3u8(
+            "https://example.com/1.mp4\nhttps://example.com/2.mp4",
+            "番剧",
+            3,
+        )
+
+        self.assertIn("#EXTINF:-1,番剧-第四集", payload.decode())
+        self.assertIn("#EXTINF:-1,番剧-第五集", payload.decode())
+
+    def test_convert_urls_normalizes_invalid_or_negative_offset(self) -> None:
+        self.assertIn(
+            "#EXTINF:-1,番剧-第一集",
+            convert_urls_to_m3u8("https://example.com/1.mp4", "番剧", -3).decode(),
+        )
+        self.assertIn(
+            "#EXTINF:-1,番剧-第一集",
+            convert_urls_to_m3u8("https://example.com/1.mp4", "番剧", "invalid").decode(),
+        )
+
     def test_convert_urls_requires_at_least_one_url(self) -> None:
         with self.assertRaisesRegex(ValueError, "未提供"):
             convert_urls_to_m3u8("\n  ", "番剧")
