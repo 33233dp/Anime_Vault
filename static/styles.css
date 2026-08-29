@@ -1622,8 +1622,14 @@ textarea {
 }
 
 [data-resource-link][hidden],
-[data-resource-playlist][hidden] {
+[data-resource-playlist][hidden],
+[data-resource-url-list][hidden] {
   display: none;
+}
+
+.editor-field__hint {
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 
 .playlist-upload__dropzone {

@@ -105,14 +105,18 @@ def render_anime_form_page(
         "STILL_PATH": html.escape(values.get("still_path", ""), quote=True),
         "PLAYBACK_URL": html.escape(values.get("playback_url", ""), quote=True),
         "RESOURCE_LINK_CHECKED": (
-            "checked" if values.get("resource_type", "link") != "playlist" else ""
+            "checked" if values.get("resource_type", "link") == "link" else ""
         ),
         "RESOURCE_PLAYLIST_CHECKED": (
             "checked" if values.get("resource_type", "link") == "playlist" else ""
         ),
+        "RESOURCE_URL_LIST_CHECKED": (
+            "checked" if values.get("resource_type", "link") == "url_list" else ""
+        ),
         "PLAYLIST_FILE_STATUS": html.escape(
             values.get("playlist_name", "") or "未选择文件"
         ),
+        "URL_LIST_TEXT": html.escape(values.get("url_list_text", "")),
         "PLAYBACK_MODE_ONLINE_CHECKED": (
             "checked" if values.get("playback_mode", "online") != "local" else ""
         ),

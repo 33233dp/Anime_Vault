@@ -4,6 +4,7 @@ import http.client
 import tempfile
 import threading
 import unittest
+from urllib.parse import urlencode
 from pathlib import Path
 from unittest.mock import patch
 
@@ -103,6 +104,37 @@ class CreateM3U8AnimeTests(unittest.TestCase):
         self.assertEqual(anime["episode_count"], 2)
         self.assertEqual(len(anime["playlist_episodes"]), 2)
         self.assertIn("%5B01%5D.mp4", anime["playlist_episodes"][0]["url"])
+
+    def test_url_list_can_create_and_parse_anime_without_images(self) -> None:
+        fields = {
+            "slug": "url-list-test",
+            "title": "URL 番剧",
+            "resource_type": "url_list",
+            "url_list_text": "https://media.example.test/1.mp4\nhttps://media.example.test/2.mp4",
+        }
+        payload = urlencode(fields).encode("utf-8")
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.server.server_address[1], timeout=5
+        )
+        connection.request(
+            "POST",
+            "/anime/create",
+            body=payload,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Length": str(len(payload)),
+            },
+        )
+        response = connection.getresponse()
+        response.read()
+        connection.close()
+
+        self.assertEqual(response.status, 303)
+        anime = get_anime("url-list-test")
+        self.assertIsNotNone(anime)
+        self.assertEqual(anime["resource_type"], "playlist")
+        self.assertEqual(anime["episode_count"], 2)
+        self.assertEqual(anime["playlist_episodes"][0]["title"], "URL 番剧-第一集")
 
 
 if __name__ == "__main__":

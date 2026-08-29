@@ -9,6 +9,33 @@ URL_PATH_SAFE = "/%:@!$&'()*+,;=-._~"
 URL_QUERY_SAFE = "/%?:@!$&'()*+,;=-._~"
 
 
+def to_chinese_num(number: int) -> str:
+    """Match urls_to_m3u8/convert_to_m3u8.py episode numbering."""
+    if number < 1:
+        return str(number)
+    chinese = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+    if number < 10:
+        return chinese[number]
+    if number < 100:
+        tens, ones = divmod(number, 10)
+        result = "十" if tens == 1 else chinese[tens] + "十"
+        return result + (chinese[ones] if ones else "")
+    return str(number)
+
+
+def convert_urls_to_m3u8(url_text: str, prefix: str = "") -> bytes:
+    """Generate the same M3U8 payload as convert_to_m3u8.py."""
+    urls = [line.strip() for line in url_text.splitlines() if line.strip()]
+    if not urls:
+        raise ValueError("未提供任何 URL，请每行填写一个播放地址。")
+    lines = ["#EXTM3U"]
+    for index, url in enumerate(urls, start=1):
+        episode = to_chinese_num(index)
+        title = f"{prefix}-第{episode}集" if prefix else f"第{episode}集"
+        lines.extend([f"#EXTINF:-1,{title}", url])
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 def normalize_http_url(raw_url: str) -> str:
     parsed = urlsplit(raw_url)
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:

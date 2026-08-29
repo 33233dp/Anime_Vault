@@ -2,10 +2,28 @@ from __future__ import annotations
 
 import unittest
 
-from anime_vault.playlists import parse_m3u8_upload
+from anime_vault.playlists import convert_urls_to_m3u8, parse_m3u8_upload
 
 
 class ParseM3U8UploadTests(unittest.TestCase):
+    def test_convert_urls_matches_script_numbering_and_prefix(self) -> None:
+        payload = convert_urls_to_m3u8(
+            "https://example.com/1.mp4\n\nhttps://example.com/2.mp4\n",
+            "我推的孩子",
+        )
+        self.assertEqual(
+            payload.decode(),
+            "#EXTM3U\n"
+            "#EXTINF:-1,我推的孩子-第一集\nhttps://example.com/1.mp4\n"
+            "#EXTINF:-1,我推的孩子-第二集\nhttps://example.com/2.mp4\n",
+        )
+        episodes = parse_m3u8_upload("generated.m3u8", payload)
+        self.assertEqual(episodes[1]["title"], "我推的孩子-第二集")
+
+    def test_convert_urls_requires_at_least_one_url(self) -> None:
+        with self.assertRaisesRegex(ValueError, "未提供"):
+            convert_urls_to_m3u8("\n  ", "番剧")
+
     def test_dr_stone_sample_generates_24_episodes(self) -> None:
         sample_lines = ["#EXTM3U", "#PLAYLIST:石纪元 第一季 (2019)"]
         for episode in range(1, 25):

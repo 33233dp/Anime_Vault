@@ -137,6 +137,10 @@
                   <input name="resource_type" type="radio" value="playlist" data-resource-type {{RESOURCE_PLAYLIST_CHECKED}}>
                   <span>M3U8 文件</span>
                 </label>
+                <label>
+                  <input name="resource_type" type="radio" value="url_list" data-resource-type {{RESOURCE_URL_LIST_CHECKED}}>
+                  <span>URL 列表转 M3U8</span>
+                </label>
               </fieldset>
               <input name="playback_mode" type="hidden" value="online">
               <label class="editor-field editor-field--wide" data-resource-link>
@@ -182,6 +186,11 @@
                   </span>
                 </label>
               </div>
+              <label class="editor-field editor-field--wide url-list-input" data-resource-url-list>
+                <span>视频 URL 列表</span>
+                <textarea name="url_list_text" rows="8" placeholder="每行一个 HTTP/HTTPS 播放地址">{{URL_LIST_TEXT}}</textarea>
+                <small class="editor-field__hint">将按“{{TITLE}}-第一集、第二集……”生成 M3U8 并自动解析。</small>
+              </label>
             </div>
           </section>
 

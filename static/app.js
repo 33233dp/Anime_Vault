@@ -273,11 +273,15 @@ const syncResourceTypeControls = (form) => {
       control instanceof HTMLInputElement && control.checked
     );
     const playlistSelected = selected instanceof HTMLInputElement && selected.value === "playlist";
+    const urlListSelected = selected instanceof HTMLInputElement && selected.value === "url_list";
     form.querySelectorAll("[data-resource-link]").forEach((field) => {
-      field.hidden = playlistSelected;
+      field.hidden = playlistSelected || urlListSelected;
     });
     form.querySelectorAll("[data-resource-playlist]").forEach((field) => {
       field.hidden = !playlistSelected;
+    });
+    form.querySelectorAll("[data-resource-url-list]").forEach((field) => {
+      field.hidden = !urlListSelected;
     });
   };
 

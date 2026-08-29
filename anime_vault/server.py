@@ -23,7 +23,7 @@ from .media import (
     resolve_media_directory,
     video_mime_type,
 )
-from .playlists import parse_m3u8_upload
+from .playlists import convert_urls_to_m3u8, parse_m3u8_upload
 from .renderers import (
     asset_url,
     compose_episode_url,
@@ -687,6 +687,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             "still_path": field("still_path"),
             "playback_url": field("playback_url"),
             "resource_type": self.normalize_resource_type(field("resource_type", "link")),
+            "url_list_text": field("url_list_text"),
             "playlist_name": field("playlist_name"),
             "playback_mode": self.normalize_playback_mode(field("playback_mode", "online")),
             "local_media_dir": field("local_media_dir"),
@@ -713,7 +714,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
 
         requires_images = (
             values["playback_mode"] != "local"
-            and values["resource_type"] != "playlist"
+            and values["resource_type"] == "link"
         )
         if requires_images:
             if not values["poster_path"] and not self.has_uploaded_file(poster_upload):
@@ -749,7 +750,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
 
         playlist_episodes: list[dict[str, str]] = []
         playlist_name = ""
-        if values["resource_type"] == "playlist":
+        if values["resource_type"] in {"playlist", "url_list"}:
             if self.has_uploaded_file(playlist_upload):
                 try:
                     playlist_name = str(playlist_upload.get("filename", "") or "")
@@ -757,6 +758,15 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
                         playlist_name,
                         playlist_upload.get("data", b""),
                     )
+                except ValueError as exc:
+                    return {"values": values, "record": None, "error": str(exc)}
+            elif values["resource_type"] == "url_list":
+                try:
+                    playlist_name = f"{values['title'] or values['slug']}.m3u8"
+                    generated_playlist = convert_urls_to_m3u8(
+                        values["url_list_text"], values["title"]
+                    )
+                    playlist_episodes = parse_m3u8_upload(playlist_name, generated_playlist)
                 except ValueError as exc:
                     return {"values": values, "record": None, "error": str(exc)}
             elif existing_anime and existing_anime.get("resource_type") == "playlist":
@@ -807,7 +817,7 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
             "episode_query_prefix": values["episode_query_prefix"],
             "episode_start_number": episode_start_number,
             "episode_other": values["episode_other"],
-            "resource_type": values["resource_type"],
+            "resource_type": "playlist" if values["resource_type"] in {"playlist", "url_list"} else values["resource_type"],
             "playlist_name": playlist_name or values["playlist_name"],
             "playlist_episodes": playlist_episodes,
             "last_played_episode": 0,
@@ -1234,7 +1244,9 @@ class AnimeRequestHandler(SimpleHTTPRequestHandler):
         return "local" if value == "local" else "online"
 
     def normalize_resource_type(self, value: str) -> str:
-        return "playlist" if value == "playlist" else "link"
+        if value in {"playlist", "url_list"}:
+            return value
+        return "link"
 
     def read_form_data(self) -> dict[str, list[str]]:
         form_data, _ = self.read_request_data()
