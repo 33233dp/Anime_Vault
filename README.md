@@ -4,6 +4,10 @@ Anime Vault 是一个面向个人使用的本地番剧管理与观看网页。�
 
 Anime Vault 项目提供了与 Animeko 配合使用的订阅配置和 Selector 数据源接口，可以将 Anime Vault 中的番剧和剧集接入 Animeko；[Animeko](https://github.com/open-ani/animeko) 负责弹幕等更完整的观看体验。Anime Vault本身具有基本的播放能力，因此即使不是 Animeko 用户，也可以单独使用它管理和观看番剧。
 
+
+[docs/运行教程文档.md](docs/运行教程文档.md)：启动、访问、页面使用和常见问题。
+
+
 ## 推荐使用方式
 
 最推荐的组合是：
@@ -435,6 +439,3 @@ cp data/anime.db data/anime.db.bak
 
 如果确定要重新生成数据库，可以删除 `data/anime.db` 后重新启动服务。删除会丢失播放地址、剧集配置、导入的播放列表和播放记录。
 
-## 文档
-
-- [docs/运行教程文档.md](docs/运行教程文档.md)：启动、访问、页面使用和常见问题。
